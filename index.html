@@ -1091,18 +1091,24 @@ const TRAMOS = [
 const MIN_DESCENDIENTES = [2400, 2700, 4000, 4500, 4500];
 
 // Reducción por rendimientos del trabajo (art. 20 LIRPF, 2024)
-function reduccionTrabajo(rentaNeta) {
-  if (rentaNeta <= 14852) return 7302;
-  if (rentaNeta <= 17673.52) return 7302 - 1.75 * (rentaNeta - 14852);
-  return 2364;  // reducción fija para rentas > 17.673,52 (antes del límite)
+// Tramo 1: ≤14.852 → 7.302€
+// Tramo 2: 14.852–17.673,52 → decreciente
+// Tramo 3: 17.673,52–19.747,50 → decreciente
+// >19.747,50 → sin reducción
+function reduccionTrabajo(rendimientoNeto) {
+  if (rendimientoNeto <= 14852) return 7302;
+  if (rendimientoNeto <= 17673.52) return 7302 - 1.75 * (rendimientoNeto - 14852);
+  if (rendimientoNeto <= 19747.50) return 2364.34 - 1.14 * (rendimientoNeto - 17673.52);
+  return 0;
 }
 
-// Deducción por donativos (Ley 49/2002)
+// Deducción por donativos (Ley 49/2002, reforma 2024)
+// 80% primeros 250€, 40% del resto (45% si reiteración, aquí usamos 40%)
 function deduccionDonativos(importe) {
   if (importe <= 0) return 0;
-  const primeros150 = Math.min(importe, 150) * 0.80;  // 80% primeros 150€
-  const resto = Math.max(0, importe - 150) * 0.35;     // 35% del resto
-  return primeros150 + resto;
+  const primeros250 = Math.min(importe, 250) * 0.80;
+  const resto = Math.max(0, importe - 250) * 0.40;
+  return primeros250 + resto;
 }
 
 // Deducción vivienda habitual (régimen transitorio, max 9.040€ base, 15%)
@@ -1134,24 +1140,33 @@ function calcIRPF(renta) {
 }
 
 function calcLiquidacionIRPF(rentaBruta, nHijos, aportPensiones, dedMaternidad, dedVivienda, donativos, tipoRetencion) {
-  // 1. Reducciones
+  // 0. Gastos deducibles (art. 19.2 LIRPF): 2.000€ fijos para rendimientos del trabajo
+  const gastosDeducibles = 2000;
+  const rendimientoNeto = Math.max(0, rentaBruta - gastosDeducibles);
+
+  // 1. Reducciones sobre el rendimiento neto
+  const redTrabajo = reduccionTrabajo(rendimientoNeto);
+  const pensionesEfectivas = Math.min(aportPensiones, 1500);  // tope legal 1.500€
+  const totalReducciones = gastosDeducibles + redTrabajo + pensionesEfectivas;
+
+  // 2. Base liquidable (renta bruta − gastos − reducción trabajo − pensiones)
+  const baseLiquidable = Math.max(0, rentaBruta - totalReducciones);
+
+  // 3. Cuota íntegra (tarifa sobre base liquidable)
+  const resultTramos = calcIRPF(baseLiquidable);
+
+  // 4. Mínimo personal y familiar como "tramo a tipo cero"
+  //    Se aplica la tarifa al mínimo y se resta de la cuota (art. 56-58 LIRPF)
   const minPersonal = 5550;
   let minDescendientes = 0;
   for (let i = 0; i < nHijos; i++) {
     minDescendientes += (i < MIN_DESCENDIENTES.length) ? MIN_DESCENDIENTES[i] : 4500;
   }
-  const redTrabajo = reduccionTrabajo(rentaBruta);
-  const pensionesEfectivas = Math.min(aportPensiones, 1500);  // tope legal 1.500€
-  const totalReducciones = minPersonal + minDescendientes + redTrabajo + pensionesEfectivas;
+  const minimoTotal = minPersonal + minDescendientes;
+  const cuotaMinimo = calcIRPF(minimoTotal).cuota;  // cuota que "exonera" el mínimo
+  const cuotaIntegra = Math.max(0, resultTramos.cuota - cuotaMinimo);
 
-  // 2. Base liquidable
-  const baseLiquidable = Math.max(0, rentaBruta - totalReducciones);
-
-  // 3. Cuota íntegra (sobre base liquidable)
-  const resultTramos = calcIRPF(baseLiquidable);
-  const cuotaIntegra = resultTramos.cuota;
-
-  // 4. Deducciones
+  // 5. Deducciones (reducen la cuota)
   let totalDeducciones = 0;
   let dedMaternidadEuros = 0;
   let dedViviendaEuros = 0;
@@ -1170,13 +1185,13 @@ function calcLiquidacionIRPF(rentaBruta, nHijos, aportPensiones, dedMaternidad, 
     totalDeducciones += dedDonativosEuros;
   }
 
-  // 5. Cuota líquida
+  // 6. Cuota líquida
   const cuotaLiquida = Math.max(0, cuotaIntegra - totalDeducciones);
 
-  // 6. Retenciones
+  // 7. Retenciones
   const retenciones = rentaBruta * (tipoRetencion / 100);
 
-  // 7. Cuota diferencial
+  // 8. Cuota diferencial
   const cuotaDiferencial = cuotaLiquida - retenciones;
 
   // Tipo efectivo real (cuota líquida / renta bruta)
@@ -1185,8 +1200,11 @@ function calcLiquidacionIRPF(rentaBruta, nHijos, aportPensiones, dedMaternidad, 
   return {
     rentaBruta,
     // Reducciones detalle
+    gastosDeducibles,
     minPersonal,
     minDescendientes,
+    minimoTotal,
+    cuotaMinimo,
     redTrabajo,
     pensionesEfectivas,
     totalReducciones,
@@ -1245,7 +1263,7 @@ function updateIRPF() {
     { arrow: true },
     { label: 'Base liquidable', value: fmt(L.baseLiquidable) + '€', cls: '' },
     { arrow: true },
-    { label: 'Cuota íntegra', value: fmt(L.cuotaIntegra) + '€', cls: '' },
+    { label: 'Tarifa − Mínimo', value: fmt(L.cuotaIntegra) + '€', cls: '' },
     { arrow: true },
     { label: 'Deducciones', value: '−' + fmt(L.totalDeducciones) + '€', cls: 'negative' },
     { arrow: true },
@@ -1380,13 +1398,15 @@ function updateIRPF() {
   // Interpretation text
   const interpEl = document.getElementById('irpf-interp');
   let interp = `<strong>Interpretación:</strong> Con una renta bruta de ${fmt(L.rentaBruta)}€, `;
-  interp += `las reducciones suman ${fmt(L.totalReducciones)}€ `;
-  interp += `(mínimo personal: ${fmt(L.minPersonal)}€`;
-  if (L.minDescendientes > 0) interp += `, mínimo descendientes: ${fmt(L.minDescendientes)}€`;
-  interp += `, reducción trabajo: ${fmt(L.redTrabajo)}€`;
+  interp += `se deducen ${fmt(L.gastosDeducibles)}€ de gastos deducibles del trabajo. `;
+  interp += `Las reducciones suman ${fmt(L.totalReducciones)}€ `;
+  interp += `(gastos deducibles: ${fmt(L.gastosDeducibles)}€`;
+  if (L.redTrabajo > 0) interp += `, reducción trabajo: ${fmt(L.redTrabajo)}€`;
   if (L.pensionesEfectivas > 0) interp += `, pensiones: ${fmt(L.pensionesEfectivas)}€`;
   interp += `), dejando una base liquidable de ${fmt(L.baseLiquidable)}€. `;
-  interp += `La cuota íntegra es ${fmt(L.cuotaIntegra)}€ (tipo marginal ${(L.tipoMarginal*100).toFixed(0)}%). `;
+  interp += `El mínimo personal y familiar (${fmt(L.minimoTotal)}€) opera como un tramo a tipo cero, `;
+  interp += `reduciendo la cuota en ${fmt(L.cuotaMinimo)}€. `;
+  interp += `La cuota íntegra resultante es ${fmt(L.cuotaIntegra)}€ (tipo marginal ${(L.tipoMarginal*100).toFixed(0)}%). `;
   if (L.totalDeducciones > 0) {
     interp += `Las deducciones reducen la cuota en ${fmt(L.totalDeducciones)}€`;
     const dedDetalles = [];
@@ -1405,7 +1425,8 @@ function updateIRPF() {
     interp += `<strong>Resultado: saldo cero</strong> en la declaración. `;
   }
   interp += `El tipo efectivo real es ${(L.tipoEfectivo*100).toFixed(1)}%, frente al ${(L.tipoMarginal*100).toFixed(0)}% marginal — `;
-  interp += `esta brecha refleja la progresividad del impuesto, amplificada por reducciones y deducciones.`;
+  interp += `esta brecha refleja la progresividad del impuesto, amplificada por reducciones, mínimos y deducciones. `;
+  interp += `<em>(Nota: simulación simplificada — solo rendimientos del trabajo, escala autonómica subsidiaria.)</em>`;
   interpEl.innerHTML = interp;
 }
 
