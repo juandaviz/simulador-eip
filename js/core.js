@@ -112,7 +112,7 @@
         if (px < a.left || px > a.right) return;
         ctx.strokeStyle = r.color || SIM.color.gris; ctx.lineWidth = 1.2; ctx.setLineDash(r.dash || [5, 4]);
         ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke(); ctx.setLineDash([]);
-        if (r.label) { ctx.fillStyle = r.color || SIM.color.gris; ctx.textAlign = 'left'; ctx.fillText(r.label, px + 4, a.top + 12); }
+        if (r.label) { ctx.fillStyle = r.color || SIM.color.gris; const der = r.align === 'right'; ctx.textAlign = der ? 'right' : 'left'; ctx.fillText(r.label, px + (der ? -4 : 4), a.top + 12 + (r.dy || 0)); }
       });
       (opts.y || []).forEach(r => {
         const py = sy.getPixelForValue(r.value);
