@@ -37,18 +37,25 @@
   SIM.serie = [SIM.color.azul, SIM.color.naranja, SIM.color.verde, SIM.color.rojo, SIM.color.gris, SIM.color.azulClaro];
 
   /* ---------- Formato ---------- */
-  const nf0 = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 });
-  const nf1 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const nf2 = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Formato español con punto de miles SIEMPRE (Intl en es-ES no agrupa los números de cuatro cifras)
+  function num(v, d) {
+    if (v == null || isNaN(v)) return '—';
+    if (Math.abs(v) < 0.5 * Math.pow(10, -d)) v = 0;  // evita «-0,00»
+    const neg = v < 0; const s = Math.abs(v).toFixed(d);
+    let [ent, dec] = s.split('.');
+    ent = ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (neg ? '−' : '') + ent + (dec ? ',' + dec : '');
+  }
   SIM.fmt = {
-    n0: v => nf0.format(v),
-    n1: v => nf1.format(v),
-    n2: v => nf2.format(v),
-    eur: (v, d = 2) => (d === 0 ? nf0 : d === 1 ? nf1 : nf2).format(v) + ' €',
-    eur0: v => nf0.format(v) + ' €',
-    pct: (v, d = 1) => (d === 0 ? nf0 : d === 1 ? nf1 : nf2).format(v * 100) + ' %',
-    pp: v => (v >= 0 ? '+' : '') + nf1.format(v) + ' pp',
-    signo: v => (v > 0 ? '+' : '') + nf2.format(v)
+    num,
+    n0: v => num(v, 0),
+    n1: v => num(v, 1),
+    n2: v => num(v, 2),
+    eur: (v, d = 2) => num(v, d) + ' €',
+    eur0: v => num(v, 0) + ' €',
+    pct: (v, d = 1) => num(v * 100, d) + ' %',
+    pp: v => (v >= 0 ? '+' : '') + num(v, 1) + ' pp',
+    signo: v => (v > 0 ? '+' : '') + num(v, 2)
   };
 
   /* ---------- Helpers de HTML ---------- */
@@ -136,7 +143,7 @@
     d.color = SIM.color.tinta;
     d.responsive = true;
     d.maintainAspectRatio = false;
-    d.animation = { duration: 250 };
+    d.animation = { duration: 0 };   // respuesta inmediata a los controles y capturas fiables
     d.plugins.legend.position = 'top';
     d.plugins.legend.labels.boxWidth = 14;
     d.plugins.legend.labels.boxHeight = 3;
@@ -147,10 +154,11 @@
     d.elements.point.radius = 0;
     d.elements.point.hitRadius = 8;
     d.elements.bar.borderRadius = 3;
-    d.scales = d.scales || {};
-    d.scale.grid = { color: 'rgba(0,0,0,.06)' };
-    d.scale.border = { color: 'rgba(0,0,0,.25)' };
-    d.scale.title = { display: true, color: SIM.color.gris, font: { size: 11 } };
+    d.scale.grid.color = 'rgba(0,0,0,.06)';
+    d.scale.border.color = 'rgba(0,0,0,.25)';
+    d.scale.title.display = true;
+    d.scale.title.color = SIM.color.gris;
+    d.scale.title.font = { size: 11 };
   };
 
   // Crea o reemplaza el gráfico de un canvas.
