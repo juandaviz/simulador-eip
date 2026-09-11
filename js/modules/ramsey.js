@@ -66,7 +66,13 @@
     <table class="tabla" id="ram-tabla"></table>
   </div>
 
-  <div class="card interpretation" id="ram-interp"></div>`;
+  <div class="card interpretation" id="ram-interp"></div>
+  <div class="card">
+    <h3>La crítica: Ramsey no sirve para defender tipos distintos de IVA</h3>
+    <p style="font-size:.86rem">Invocar la regla de Ramsey para justificar un IVA con varios tipos confunde un <strong>resultado parcial</strong> con la <strong>arquitectura general</strong> del sistema tributario. Ramsey responde a una pregunta muy concreta: cómo recaudar con la menor distorsión posible cuando el Estado <em>solo</em> puede gravar bienes. Un sistema fiscal moderno no parte de ahí: ya tiene un IRPF progresivo, que es el instrumento natural para redistribuir.</p>
+    <p style="font-size:.86rem">En ese contexto la respuesta la da el <strong>teorema de Atkinson y Stiglitz (1976)</strong>: con un impuesto sobre la renta no lineal disponible (y preferencias separables entre consumo y ocio), la imposición indirecta óptima es <strong>uniforme</strong>. Un IVA diferenciado distorsiona las decisiones de consumo sin aportar una ganancia redistributiva que el IRPF no pueda conseguir mejor y más barata. Es la posición de la <em>Mirrlees Review</em> (2011) y la que defiende Jesús Fernández-Villaverde en un hilo de X de 2026, donde lamenta que los manuales españoles de Hacienda Pública no lo expliquen bien.</p>
+    <p style="font-size:.86rem"><strong>Cómo usarlo con este simulador.</strong> El módulo muestra la tensión eficiencia-equidad <em>dentro</em> de la imposición indirecta, que es el mundo de Ramsey. La crítica dice que esa tensión desaparece en cuanto se amplía el conjunto de instrumentos: la eficiencia la da el IVA uniforme y la equidad, el IRPF con transferencias. Los dos argumentos que quedan a favor de los tipos reducidos son empíricos, no de Ramsey: que la separabilidad falle (bienes complementarios del ocio) y que el IRPF y las transferencias no lleguen a quien se pretende proteger.</p>
+  </div>`;
 
   function calcular() {
     const target = SIM.val('ram-target');
