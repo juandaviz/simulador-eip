@@ -8,8 +8,8 @@ Simuladores interactivos para **Hacienda Pública II** (Grado en Economía) y **
 
 | Módulo | Tema HP II | Qué enseña |
 |---|---|---|
-| IRPF 2025 | Tema 3 | Liquidación completa con escala estatal y autonómica (Andalucía, Madrid), base general y del ahorro, mínimo como tramo a tipo cero, y casillas con cuantía para cada reducción de la base y cada deducción de la cuota (estatales, reembolsables y las 17 autonómicas de Andalucía). |
 | Liquidar un impuesto | Tema 1 | La cascada hecho imponible → deuda tributaria con tarifa editable; cuota = área bajo la escalera del marginal; proporcional, progresivo y de suma fija. |
+| IRPF 2025 | Tema 3 | Liquidación completa con escala estatal y autonómica (Andalucía, Madrid), base general y del ahorro, mínimo como tramo a tipo cero, y casillas con cuantía para cada reducción de la base y cada deducción de la cuota (estatales, reembolsables y las 17 autonómicas de Andalucía). |
 | IVA en cadena | Tema 6 | Repercutido, soportado e ingresado por fases; exención intermedia (piramidación), impuesto en cascada, IVA absorbido cuando el precio no puede subir. |
 | Incidencia | Tema 7 | Reparto de la carga según elasticidades; la incidencia legal no cambia la económica. |
 | Exceso de gravamen | Tema 8 | Harberger: el exceso crece con el cuadrado del tipo; coste marginal de los fondos públicos. |
