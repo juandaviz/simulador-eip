@@ -100,14 +100,82 @@
     return 0;
   };
 
+  /* ---------- Deducciones autonómicas de Andalucía (2025) ---------- */
+  // a: importes/indicadores introducidos; ctx: { renta: base imponible general + ahorro, conjunta: bool, hijos }
+  // Límites de renta: individual / conjunta. Fuente: guía del Modelo 100, apartado 10.1.
+  TAX.ANDALUCIA = [
+    { clave: 'nacimiento', nombre: 'Nacimiento, adopción o acogimiento', regla: '200 € por hijo nacido o adoptado en el año', tipo: 'n', limite: [25000, 30000], calc: n => 200 * n },
+    { clave: 'adopcionInt', nombre: 'Adopción internacional', regla: '600 € por hijo', tipo: 'n', limite: [80000, 100000], calc: n => 600 * n },
+    { clave: 'monoparental', nombre: 'Familia monoparental', regla: '100 €, más 100 € por ascendiente a cargo', tipo: 'n', limite: [80000, 100000], calc: n => 100 + 100 * n, nLabel: 'ascendientes a cargo' },
+    { clave: 'numerosa', nombre: 'Familia numerosa', regla: '200 € (general) o 400 € (especial)', tipo: 'sel', opciones: [['general', 'General, 200 €'], ['especial', 'Especial, 400 €']], limite: [25000, 30000], calc: v => v === 'especial' ? 400 : 200 },
+    { clave: 'educacion', nombre: 'Gastos de enseñanza de idiomas o informática', regla: '15 % del gasto, máximo 150 € por descendiente', tipo: 'eur', limite: [80000, 100000], calc: (x, ctx) => Math.min(0.15 * x, 150 * Math.max(1, ctx.hijos)) },
+    { clave: 'discapacidad', nombre: 'Contribuyente con discapacidad', regla: '150 €', tipo: 'si', limite: [25000, 30000], calc: () => 150 },
+    { clave: 'conyugeDisc', nombre: 'Cónyuge o pareja con discapacidad ≥ 65 %', regla: '100 €', tipo: 'si', limite: [25000, 30000], calc: () => 100 },
+    { clave: 'asistencia', nombre: 'Asistencia a personas con discapacidad', regla: '100 € por persona asistida', tipo: 'n', limite: [80000, 100000], calc: n => 100 * n },
+    { clave: 'celiaca', nombre: 'Enfermedad celíaca', regla: '100 € por miembro diagnosticado', tipo: 'n', limite: [80000, 100000], calc: n => 100 * n },
+    { clave: 'viviendaProt', nombre: 'Vivienda habitual protegida o de personas jóvenes', regla: '6 % de lo pagado, base máxima 9.040 €', tipo: 'eur', limite: [25000, 30000], calc: x => 0.06 * Math.min(x, 9040) },
+    { clave: 'alquiler', nombre: 'Alquiler de la vivienda habitual', regla: '15 % del alquiler, máximo 1.200 €', tipo: 'eur', limite: [25000, 30000], calc: x => Math.min(0.15 * x, 1200) },
+    { clave: 'acciones', nombre: 'Inversión en acciones o participaciones de nuevas sociedades', regla: '20 %, máximo 4.000 €', tipo: 'eur', limite: null, calc: x => Math.min(0.20 * x, 4000) },
+    { clave: 'domestica', nombre: 'Ayuda doméstica', regla: '20 % de la cotización pagada, máximo 500 €', tipo: 'eur', limite: null, calc: x => Math.min(0.20 * x, 500) },
+    { clave: 'defensa', nombre: 'Defensa jurídica de la relación laboral', regla: 'gasto pagado, máximo 200 €', tipo: 'eur', limite: null, calc: x => Math.min(x, 200) },
+    { clave: 'ecologico', nombre: 'Donativos con finalidad ecológica', regla: '10 %, máximo 150 €', tipo: 'eur', limite: [80000, 100000], calc: x => Math.min(0.10 * x, 150) },
+    { clave: 'deporte', nombre: 'Ejercicio físico y práctica deportiva', regla: '15 % de las cuotas, máximo 100 €', tipo: 'eur', limite: [80000, 100000], calc: x => Math.min(0.15 * x, 100) },
+    { clave: 'veterinario', nombre: 'Gastos veterinarios y tenencia de animales', regla: '30 %, máximo 100 €', tipo: 'eur', limite: [80000, 100000], calc: x => Math.min(0.30 * x, 100) }
+  ];
+  TAX.deduccionesAndalucia = function (a, ctx) {
+    a = a || {}; ctx = ctx || {};
+    const items = [];
+    let total = 0;
+    for (const d of TAX.ANDALUCIA) {
+      const v = a[d.clave];
+      if (v == null || v === false || v === 0 || v === '' || v === 'no') continue;
+      const lim = d.limite ? d.limite[ctx.conjunta ? 1 : 0] : null;
+      const excede = lim != null && ctx.renta > lim;
+      const bruto = d.calc(d.tipo === 'sel' ? v : (d.tipo === 'si' ? 1 : Number(v)), ctx);
+      const importe = excede ? 0 : Math.max(0, bruto);
+      items.push({ clave: d.clave, nombre: d.nombre, importe, bruto, excede, limite: lim });
+      total += importe;
+    }
+    return { items, total };
+  };
+
+  /* ---------- Deducciones estatales (cuantías a partir de los importes introducidos) ---------- */
+  TAX.deduccionesEstatales = function (p, baseImponible) {
+    const d = {};
+    d.vivienda = TAX.deduccionVivienda(p.viviendaBase);
+    // Alquiler (régimen transitorio): 10,05 % de lo pagado; base máxima 9.040 € hasta BI 17.707,20, decreciente hasta 24.107,20
+    let baseAlq = 0;
+    if (p.alquilerPagado > 0 && baseImponible < 24107.20) {
+      const max = baseImponible <= 17707.20 ? 9040 : 9040 - 1.4125 * (baseImponible - 17707.20);
+      baseAlq = Math.min(p.alquilerPagado, Math.max(0, max));
+    }
+    d.alquiler = 0.1005 * baseAlq;
+    // Donativos según destino
+    const x = Math.max(0, p.donativos || 0);
+    switch (p.donativosTipo) {
+      case 'prioritarias': d.donativos = Math.min(x, 250) * 0.85 + Math.max(0, x - 250) * (p.donativosRecurrente ? 0.50 : 0.45); break;
+      case 'partidos': d.donativos = 0.20 * Math.min(x, 600); break;
+      case 'otras': d.donativos = 0.10 * x; break;
+      default: d.donativos = TAX.deduccionDonativos(x, p.donativosRecurrente);
+    }
+    d.empresaNueva = 0.50 * Math.min(Math.max(0, p.empresaNueva || 0), 100000);
+    d.vehiculo = 0.15 * Math.min(Math.max(0, p.vehiculoElectrico || 0), 20000) + 0.15 * Math.min(Math.max(0, p.puntoRecarga || 0), 4000);
+    const baseEf = { 20: 5000, 40: 7500, 60: 5000 }[p.eficienciaPct] || 0;
+    d.eficiencia = (p.eficienciaPct / 100) * Math.min(Math.max(0, p.eficienciaImporte || 0), baseEf);
+    d.ley52025 = p.aplicarLey52025 ? TAX.deduccionLey52025(p.trabajoBruto) : 0;
+    return d;
+  };
+
   /* ---------- Liquidación completa ---------- */
   /*
    p = {
      trabajoBruto, cotizaciones (null → automáticas), otrosGastos (2000),
      capitalMobiliario, gananciasNetas, inmobiliarioNeto, imputacion,
-     planPensiones, ccaa ('and'|'mad'|'est'),
-     hijos, hijosMenores3, mayor65, mayor75, ascendientes, discapacidad,
-     donativos, donativosRecurrente, viviendaBase, maternidad, dedAutonomicas, aplicarLey52025,
+     ccaa ('and'|'mad'|'est'), hijos, hijosMenores3, mayor65, mayor75, ascendientes, discapacidad,
+     — reducciones —  planPensiones, planEmpresa, planConyuge, pensionCompensatoria, previsionDiscapacidad, patrimonioProtegido, conjunta ('no'|'bi'|'mono')
+     — deducciones estatales —  viviendaBase, alquilerPagado, donativos, donativosTipo, donativosRecurrente, empresaNueva, vehiculoElectrico, puntoRecarga, eficienciaImporte, eficienciaPct, aplicarLey52025
+     — autonómicas —  dedAutonomicas (importe directo), andalucia (objeto para TAX.deduccionesAndalucia; solo si ccaa = 'and')
+     — reembolsables —  maternidad, familiaNumerosa ('no'|'general'|'especial'), descendientesDiscapacidad
      retencionesTrabajo (null → 15 % del bruto), retencionAhorro (0.19)
    }
   */
@@ -115,9 +183,11 @@
     p = Object.assign({
       trabajoBruto: 0, cotizaciones: null, otrosGastos: TAX.OTROS_GASTOS,
       capitalMobiliario: 0, gananciasNetas: 0, inmobiliarioNeto: 0, imputacion: 0,
-      planPensiones: 0, ccaa: 'and',
-      hijos: 0, hijosMenores3: 0, mayor65: false, mayor75: false, ascendientes: 0, discapacidad: 'no',
-      donativos: 0, donativosRecurrente: false, viviendaBase: 0, maternidad: false, dedAutonomicas: 0, aplicarLey52025: true,
+      ccaa: 'and', hijos: 0, hijosMenores3: 0, mayor65: false, mayor75: false, ascendientes: 0, discapacidad: 'no',
+      planPensiones: 0, planEmpresa: 0, planConyuge: 0, pensionCompensatoria: 0, previsionDiscapacidad: 0, patrimonioProtegido: 0, conjunta: 'no',
+      viviendaBase: 0, alquilerPagado: 0, donativos: 0, donativosTipo: '49', donativosRecurrente: false, empresaNueva: 0, vehiculoElectrico: 0, puntoRecarga: 0, eficienciaImporte: 0, eficienciaPct: 0, aplicarLey52025: true,
+      dedAutonomicas: 0, andalucia: null,
+      maternidad: false, familiaNumerosa: 'no', descendientesDiscapacidad: 0,
       retencionesTrabajo: null, retencionAhorro: 0.19
     }, p || {});
 
@@ -135,11 +205,24 @@
     const baseGeneral = rnTrabajoReducido + Math.max(0, p.inmobiliarioNeto) + Math.max(0, p.imputacion);
     const ahorroBruto = p.capitalMobiliario + p.gananciasNetas;
     const baseAhorro = Math.max(0, ahorroBruto); // el saldo negativo se compensaría en 4 años (no modelado)
+    const baseImponible = baseGeneral + baseAhorro;
 
-    // 3. Reducciones: plan de pensiones (tope 1.500 € y 30 % de los rendimientos del trabajo)
-    const pensiones = Math.min(p.planPensiones, 1500, 0.30 * rnTrabajo);
-    const baseLiqGeneral = Math.max(0, baseGeneral - pensiones);
-    const baseLiqAhorro = baseAhorro;
+    // 3. Reducciones de la base imponible general
+    const red = {};
+    const propio = Math.min(Math.max(0, p.planPensiones), 1500);
+    const empresa = Math.min(Math.max(0, p.planEmpresa), 8500);
+    red.prevision = Math.min(propio + empresa, 0.30 * rnTrabajo);           // límite conjunto: 30 % de los rendimientos del trabajo
+    red.conyuge = Math.min(Math.max(0, p.planConyuge), 1000);
+    red.pensionCompensatoria = Math.max(0, p.pensionCompensatoria);
+    red.previsionDiscapacidad = Math.min(Math.max(0, p.previsionDiscapacidad), 10000);
+    red.patrimonioProtegido = Math.min(Math.max(0, p.patrimonioProtegido), 10000);
+    red.conjunta = p.conjunta === 'bi' ? 3400 : p.conjunta === 'mono' ? 2150 : 0;
+    const totalReducciones = Object.values(red).reduce((a, b) => a + b, 0);
+    const pensiones = red.prevision; // compatibilidad con versiones anteriores
+    const reduccionesGeneral = Math.min(totalReducciones, baseGeneral);
+    const reduccionesAhorro = Math.min(totalReducciones - reduccionesGeneral, baseAhorro); // el remanente pasa a la base del ahorro
+    const baseLiqGeneral = baseGeneral - reduccionesGeneral;
+    const baseLiqAhorro = baseAhorro - reduccionesAhorro;
 
     // 4. Mínimo personal y familiar (como tramo a tipo cero); el remanente pasa a la base del ahorro
     const min = TAX.minimo(p);
@@ -157,32 +240,35 @@
     const cuotaIntegraAutonomica = cuotaAutonomicaGeneral + cuotaAhorro / 2;
     const cuotaIntegra = cuotaIntegraEstatal + cuotaIntegraAutonomica;
 
-    // 6. Deducciones en cuota (no reembolsables: no pueden dejar la cuota por debajo de cero)
-    const ded = {
-      vivienda: TAX.deduccionVivienda(p.viviendaBase),
-      donativos: TAX.deduccionDonativos(p.donativos, p.donativosRecurrente),
-      ley52025: p.aplicarLey52025 ? TAX.deduccionLey52025(p.trabajoBruto) : 0,
-      autonomicas: Math.max(0, p.dedAutonomicas)
-    };
-    // Orden de aplicación: estatales (vivienda, donativos, Ley 5/2025) y después autonómicas
+    // 6. Deducciones en cuota (no reembolsables)
+    const ded = TAX.deduccionesEstatales(p, baseImponible);
+    const and = (p.ccaa === 'and' && p.andalucia) ? TAX.deduccionesAndalucia(p.andalucia, { renta: baseImponible, conjunta: p.conjunta !== 'no', hijos: p.hijos }) : { items: [], total: 0 };
+    ded.autonomicas = Math.max(0, p.dedAutonomicas) + and.total;
+    // Las estatales minoran la cuota íntegra total; las autonómicas, solo lo que quede de la cuota autonómica
     let restante = cuotaIntegra;
     const aplicadas = {}, perdidas = {};
-    for (const k of ['vivienda', 'donativos', 'ley52025', 'autonomicas']) {
-      aplicadas[k] = Math.min(ded[k], restante);
-      perdidas[k] = ded[k] - aplicadas[k];
-      restante -= aplicadas[k];
+    for (const k of ['vivienda', 'alquiler', 'donativos', 'empresaNueva', 'vehiculo', 'eficiencia', 'ley52025']) {
+      aplicadas[k] = Math.min(ded[k], restante); perdidas[k] = ded[k] - aplicadas[k]; restante -= aplicadas[k];
     }
+    const topeAut = Math.min(restante, cuotaIntegraAutonomica);
+    aplicadas.autonomicas = Math.min(ded.autonomicas, topeAut); perdidas.autonomicas = ded.autonomicas - aplicadas.autonomicas; restante -= aplicadas.autonomicas;
     const totalDeducciones = Object.values(aplicadas).reduce((a, b) => a + b, 0);
     const totalPerdidas = Object.values(perdidas).reduce((a, b) => a + b, 0);
     const cuotaLiquida = Math.max(0, cuotaIntegra - totalDeducciones);
 
-    // 7. Pagos a cuenta y deducción por maternidad (esta sí es reembolsable)
+    // 7. Pagos a cuenta y deducciones reembolsables (minoran la cuota diferencial, puedan o no absorberse)
     const retencionesTrabajo = p.retencionesTrabajo == null ? 0.15 * p.trabajoBruto : p.retencionesTrabajo;
     const retencionesAhorro = Math.max(0, p.capitalMobiliario) * p.retencionAhorro;
-    const maternidad = p.maternidad && p.hijosMenores3 > 0 ? 1200 * Math.min(p.hijosMenores3, 3) : 0;
+    const reemb = {
+      maternidad: p.maternidad && p.hijosMenores3 > 0 ? 1200 * p.hijosMenores3 : 0,
+      familiaNumerosa: p.familiaNumerosa === 'especial' ? 2400 : p.familiaNumerosa === 'general' ? 1200 : 0,
+      descendientesDiscapacidad: 1200 * Math.max(0, p.descendientesDiscapacidad || 0)
+    };
+    const maternidad = reemb.maternidad;
+    const reembolsables = reemb.maternidad + reemb.familiaNumerosa + reemb.descendientesDiscapacidad;
     const pagosACuenta = retencionesTrabajo + retencionesAhorro;
     const cuotaDiferencial = cuotaLiquida - pagosACuenta;
-    const resultado = cuotaDiferencial - maternidad; // >0 a ingresar, <0 a devolver
+    const resultado = cuotaDiferencial - reembolsables; // >0 a ingresar, <0 a devolver
 
     // 8. Tipos
     const rentaBrutaTotal = p.trabajoBruto + Math.max(0, p.capitalMobiliario) + Math.max(0, p.gananciasNetas) + Math.max(0, p.inmobiliarioNeto) + Math.max(0, p.imputacion);
@@ -192,12 +278,12 @@
 
     return {
       params: p, cotizaciones, otrosGastos: p.trabajoBruto > 0 ? p.otrosGastos : 0, rnTrabajo, redTrabajo, rnTrabajoReducido,
-      baseGeneral, baseAhorro, pensiones, baseLiqGeneral, baseLiqAhorro,
+      baseGeneral, baseAhorro, baseImponible, reducciones: red, totalReducciones, reduccionesGeneral, reduccionesAhorro, pensiones, baseLiqGeneral, baseLiqAhorro,
       minimo: min, minGeneral, minAhorro,
       escalas: { estatal: estG, autonomica: autG, ahorro: ahoG, estatalMin: estMin, autonomicaMin: autMin },
       cuotaEstatalGeneral, cuotaAutonomicaGeneral, cuotaAhorro, cuotaIntegraEstatal, cuotaIntegraAutonomica, cuotaIntegra,
-      deducciones: ded, deduccionesAplicadas: aplicadas, deduccionesPerdidas: perdidas, totalDeducciones, totalPerdidas,
-      cuotaLiquida, retencionesTrabajo, retencionesAhorro, pagosACuenta, maternidad, cuotaDiferencial, resultado,
+      deducciones: ded, andalucia: and, deduccionesAplicadas: aplicadas, deduccionesPerdidas: perdidas, totalDeducciones, totalPerdidas,
+      cuotaLiquida, retencionesTrabajo, retencionesAhorro, pagosACuenta, reembolsables: reemb, totalReembolsables: reembolsables, maternidad, cuotaDiferencial, resultado,
       rentaBrutaTotal, marginalGeneral, marginalEstatal: estG.marginal, marginalAutonomica: autG.marginal, tipoMedio, tipoMedioBase
     };
   };

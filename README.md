@@ -8,7 +8,7 @@ Simuladores interactivos para **Hacienda Pública II** (Grado en Economía) y **
 
 | Módulo | Tema HP II | Qué enseña |
 |---|---|---|
-| IRPF 2025 | Tema 3 · Práctica 1 | Liquidación completa con escala estatal y autonómica (Andalucía, Madrid), base general y del ahorro, mínimo como tramo a tipo cero, deducciones no reembolsables, pagos a cuenta. Escenarios de la Práctica 1. |
+| IRPF 2025 | Tema 3 | Liquidación completa con escala estatal y autonómica (Andalucía, Madrid), base general y del ahorro, mínimo como tramo a tipo cero, y casillas con cuantía para cada reducción de la base y cada deducción de la cuota (estatales, reembolsables y las 17 autonómicas de Andalucía). |
 | Liquidar un impuesto | Tema 1 | La cascada hecho imponible → deuda tributaria con tarifa editable; cuota = área bajo la escalera del marginal; proporcional, progresivo y de suma fija. |
 | IVA en cadena | Tema 6 | Repercutido, soportado e ingresado por fases; exención intermedia (piramidación), impuesto en cascada, IVA absorbido cuando el precio no puede subir. |
 | Incidencia | Tema 7 | Reparto de la carga según elasticidades; la incidencia legal no cambia la económica. |
@@ -48,11 +48,11 @@ $JSC js/tax.js tests/tax.test.js
 for m in js/modules/*.js; do $JSC js/tax.js tests/stub.js "$m" tests/check-module.js; done
 ```
 
-Los tests del IRPF reproducen los casos de la Práctica 1 (curso 2026-27), contrastados con Renta WEB Open de la AEAT.
+Los tests del IRPF reproducen liquidaciones de referencia contrastadas con Renta WEB Open de la AEAT.
 
 ## Normativa y datos
 
-- IRPF ejercicio 2025: Ley 35/2006 (escala estatal, reducción del art. 20, mínimos), Ley 5/2025 (deducción para rendimientos del trabajo bajos), escalas autonómicas 2025 de Andalucía y Madrid, bases de cotización 2025. Las deducciones autonómicas se introducen como importe.
+- IRPF ejercicio 2025: Ley 35/2006 (escala estatal, reducción del art. 20, mínimos, reducciones de la base, deducciones estatales y reembolsables), Ley 5/2025 (deducción para rendimientos del trabajo bajos), escalas autonómicas 2025 de Andalucía y Madrid, deducciones autonómicas de Andalucía (guía del Modelo 100, apartado 10.1) y bases de cotización 2025. Para otras comunidades, las deducciones autonómicas se introducen como importe.
 - Cuentas públicas: Eurostat, `gov_10a_main` y `gov_10a_taxag`, actualización de julio de 2026. Cifras de 2025 provisionales.
 
 ## Añadir un módulo

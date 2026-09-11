@@ -188,3 +188,18 @@ table.tabla input[type="number"] { width: 6rem; font: inherit; padding: .15rem .
   .panel { display: block !important; page-break-before: always; }
   .card { box-shadow: none; border: 1px solid var(--borde); }
 }
+
+/* Filas de reducciones y deducciones: casilla + concepto + cuantía + resultado */
+.ded-row { display: grid; grid-template-columns: 1.2rem 1fr 7.5rem 7rem; gap: .45rem; align-items: center; padding: .32rem 0; border-bottom: 1px dashed var(--borde); font-size: .8rem; }
+.ded-row label { cursor: pointer; line-height: 1.3; }
+.ded-row .nombre { display: block; }
+.ded-row .help { display: block; color: var(--gris); font-size: .7rem; }
+.ded-row .ctrl input, .ded-row .ctrl select { width: 100%; font: inherit; font-size: .8rem; padding: .22rem .35rem; border: 1px solid var(--borde); border-radius: 4px; text-align: right; font-variant-numeric: tabular-nums; }
+.ded-row .ctrl select { text-align: left; }
+.ded-row .ctrl input:disabled, .ded-row .ctrl select:disabled { opacity: .4; }
+.ded-row .res { text-align: right; font-weight: 600; color: var(--azul); font-variant-numeric: tabular-nums; font-size: .78rem; }
+.ded-row .res.no { color: var(--rojo); font-weight: 500; font-size: .68rem; }
+.ded-row:not(.activa) .nombre { color: var(--gris); }
+.ded-sub { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: center; font-size: .76rem; color: var(--gris); padding: .2rem 0 .35rem 1.65rem; border-bottom: 1px dashed var(--borde); }
+.ded-sub select { font: inherit; font-size: .76rem; padding: .18rem .3rem; border: 1px solid var(--borde); border-radius: 4px; max-width: 26rem; }
+@media (max-width: 800px) { .ded-row { grid-template-columns: 1.2rem 1fr; } .ded-row .ctrl, .ded-row .res { grid-column: 2; text-align: left; } }

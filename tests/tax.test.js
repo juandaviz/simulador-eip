@@ -1,7 +1,7 @@
 /* Tests de js/tax.js. Ejecutar (macOS, sin Node):
      /System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc js/tax.js tests/tax.test.js
    Con Node:  node tests/run.js
-   Casos de referencia: Práctica 1 de HP II 2026-27 (IRPF 2025, Andalucía), contrastados a mano
+   Casos de referencia (IRPF 2025, Andalucía) contrastados a mano
    y con el simulador Renta WEB Open de la AEAT. */
 (function () {
   let ok = 0, fail = 0;
@@ -69,5 +69,43 @@
   eq('Diamond-Saez a=1,5 e=0,25 → 72,7 %', TAX.diamondSaez(1.5, 0.25), 1 / 1.375, 1e-9);
 
   print('\n' + ok + ' correctos, ' + fail + ' fallos');
-  if (typeof quit === 'function') quit(fail ? 1 : 0);
+  globalThis.__fallos = fail;
+})();
+
+/* Reducciones y deducciones adicionales */
+(function () {
+  let ok = 0, fail = 0;
+  const eq = (n, g, e, tol) => { if (Math.abs(g - e) <= (tol == null ? 0.01 : tol)) { ok++; print('  ok   ' + n + ' = ' + g.toFixed(2)); } else { fail++; print('  FALLO ' + n + ': ' + g.toFixed(4) + ' ≠ ' + e); } };
+  print('Reducciones');
+  const r1 = TAX.liquidaIRPF({ trabajoBruto: 30000, planPensiones: 3000, planEmpresa: 9000, retencionesTrabajo: 0 });
+  eq('planes: 1.500 propio + 8.500 empresa, tope 30 % de 26.056 = 7.816,80', r1.reducciones.prevision, 7816.80);
+  const r2 = TAX.liquidaIRPF({ trabajoBruto: 30000, conjunta: 'bi', planConyuge: 2000, retencionesTrabajo: 0 });
+  eq('conjunta 3.400 + cónyuge 1.000', r2.totalReducciones, 4400);
+  print('Deducciones estatales');
+  const d1 = TAX.liquidaIRPF({ trabajoBruto: 20000, alquilerPagado: 7000, retencionesTrabajo: 0 });
+  eq('alquiler con BI 17.704 (< 17.707,20): 10,05 % de 7.000', d1.deducciones.alquiler, 703.5);
+  const d2 = TAX.liquidaIRPF({ trabajoBruto: 40000, alquilerPagado: 7000, retencionesTrabajo: 0 });
+  eq('alquiler con BI 35.408 (> 24.107,20): 0', d2.deducciones.alquiler, 0);
+  const d3 = TAX.liquidaIRPF({ trabajoBruto: 40000, donativos: 1000, donativosTipo: 'partidos', retencionesTrabajo: 0 });
+  eq('partidos políticos: 20 % de 600', d3.deducciones.donativos, 120);
+  const d4 = TAX.liquidaIRPF({ trabajoBruto: 40000, vehiculoElectrico: 30000, eficienciaImporte: 9000, eficienciaPct: 40, retencionesTrabajo: 0 });
+  eq('vehículo 15 % de 20.000 = 3.000', d4.deducciones.vehiculo, 3000);
+  eq('eficiencia 40 % de 7.500 = 3.000', d4.deducciones.eficiencia, 3000);
+  print('Deducciones andaluzas');
+  const a1 = TAX.liquidaIRPF({ trabajoBruto: 22000, andalucia: { alquiler: 9000, deporte: 500, veterinario: 200, numerosa: 'especial', discapacidad: true }, retencionesTrabajo: 0 });
+  eq('alquiler 15 % tope 1.200', a1.andalucia.items.find(x => x.clave === 'alquiler').importe, 1200);
+  eq('deporte 15 % de 500 = 75', a1.andalucia.items.find(x => x.clave === 'deporte').importe, 75);
+  eq('veterinario 30 % de 200 = 60', a1.andalucia.items.find(x => x.clave === 'veterinario').importe, 60);
+  eq('familia numerosa especial 400', a1.andalucia.items.find(x => x.clave === 'numerosa').importe, 400);
+  eq('total andaluzas 1.885', a1.andalucia.total, 1885);
+  const a2 = TAX.liquidaIRPF({ trabajoBruto: 40000, andalucia: { alquiler: 9000, deporte: 500 }, retencionesTrabajo: 0 });
+  eq('con renta > 25.000 el alquiler no se aplica', a2.andalucia.items.find(x => x.clave === 'alquiler').importe, 0);
+  eq('pero el deporte (límite 80.000) sí', a2.andalucia.items.find(x => x.clave === 'deporte').importe, 75);
+  const a3 = TAX.liquidaIRPF({ trabajoBruto: 22000, andalucia: { alquiler: 9000 }, retencionesTrabajo: 0 });
+  eq('las autonómicas no pueden superar la cuota autonómica', a3.deduccionesAplicadas.autonomicas, Math.min(1200, a3.cuotaIntegraAutonomica));
+  print('Reembolsables');
+  const m = TAX.liquidaIRPF({ trabajoBruto: 12000, hijos: 1, hijosMenores3: 1, maternidad: true, familiaNumerosa: 'general', retencionesTrabajo: 0 });
+  eq('maternidad + familia numerosa con cuota cero → a devolver 2.400', m.resultado, -2400);
+  print('\n' + ok + ' correctos, ' + fail + ' fallos (bloque 2)');
+  if (typeof quit === 'function') quit((fail + (globalThis.__fallos || 0)) ? 1 : 0);
 })();
