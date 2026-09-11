@@ -349,7 +349,7 @@
   /* ---------- Escenarios ---------- */
   const esc = (cambios) => Object.assign({}, BASE, cambios);
   SIM.register({
-    id: 'irpf', nav: 'IRPF 2025', tema: 'Tema 3',
+    id: 'irpf', nav: 'IRPF 2025', tema: 'Tema 3', resetCero: false,
     title: 'Simulador del IRPF español (ejercicio 2025)',
     subtitle: 'Liquidación completa con escala estatal y autonómica (Andalucía, Madrid), base general y del ahorro, mínimo personal y familiar como tramo a tipo cero, y casillas con su cuantía para cada reducción de la base y cada deducción de la cuota: estatales, reembolsables y las diecisiete autonómicas de Andalucía. Cuantías y límites de la guía del Modelo 100 de 2025.',
     guia: {

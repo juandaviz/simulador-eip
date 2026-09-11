@@ -205,7 +205,7 @@
     if (!m.presets || !m.presets.length) return '';
     return `<div class="presets"><span class="label">Escenarios:</span>${m.presets.map((p, i) =>
       `<button class="btn small" type="button" data-preset="${i}" title="${p.title || ''}">${p.label}</button>`).join('')}
-      <button class="btn small" type="button" data-reset>Restablecer</button></div>`;
+      <button class="btn small" type="button" data-reset title="${m.resetCero === false ? 'Vuelve a los valores iniciales' : 'Pone todos los valores a cero para hacer el ejercicio a mano'}">${m.resetCero === false ? 'Restablecer' : 'Restablecer (a cero)'}</button></div>`;
   }
 
   function mount() {
@@ -241,7 +241,7 @@
         if (!b) return;
         if (b.dataset.export !== undefined) { SIM.exportPNG(b.dataset.export, m.id + '-' + b.dataset.export); }
         if (b.dataset.preset !== undefined) { applyState(panel, m.presets[+b.dataset.preset].values); markPreset(panel, +b.dataset.preset); m.update(panel); pushState(m); }
-        if (b.dataset.reset !== undefined) { applyState(panel, m.defaults); markPreset(panel, -1); m.update(panel); pushState(m); }
+        if (b.dataset.reset !== undefined) { applyState(panel, m.resetCero === false ? m.defaults : estadoCero(panel)); markPreset(panel, -1); m.update(panel); pushState(m); }
       });
     });
     window.addEventListener('hashchange', route);
@@ -252,6 +252,17 @@
   function markPreset(panel, idx) {
     panel.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('active', +b.dataset.preset === idx));
   }
+  // Estado «en blanco»: todo a cero (o al mínimo del control si no admite cero) para trabajar el ejercicio a mano
+  function estadoCero(panel) {
+    const s = {};
+    panel.querySelectorAll('[data-state]').forEach(el => {
+      if (el.type === 'checkbox') s[el.id] = false;
+      else if (el.tagName === 'SELECT') s[el.id] = el.options.length ? el.options[0].value : '';
+      else { const min = parseFloat(el.min); s[el.id] = isNaN(min) || min <= 0 ? 0 : min; }
+    });
+    return s;
+  }
+  SIM.estadoCero = estadoCero;
   function readState(panel) {
     const s = {};
     panel.querySelectorAll('[data-state]').forEach(el => { s[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
