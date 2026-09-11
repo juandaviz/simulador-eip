@@ -201,5 +201,16 @@ table.tabla input[type="number"] { width: 6rem; font: inherit; padding: .15rem .
 .ded-row .res.no { color: var(--rojo); font-weight: 500; font-size: .68rem; }
 .ded-row:not(.activa) .nombre { color: var(--gris); }
 .ded-sub { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: center; font-size: .76rem; color: var(--gris); padding: .2rem 0 .35rem 1.65rem; border-bottom: 1px dashed var(--borde); }
-.ded-sub select { font: inherit; font-size: .76rem; padding: .18rem .3rem; border: 1px solid var(--borde); border-radius: 4px; max-width: 26rem; }
+.ded-sub select, .ded-sub input[type="number"] { font: inherit; font-size: .76rem; padding: .18rem .3rem; border: 1px solid var(--borde); border-radius: 4px; max-width: 26rem; }
+.ded-sub input[type="number"] { width: 7.5rem; text-align: right; }
 @media (max-width: 800px) { .ded-row { grid-template-columns: 1.2rem 1fr; } .ded-row .ctrl, .ded-row .res { grid-column: 2; text-align: left; } }
+
+
+/* Modo examen: se ocultan resultados, tablas de resultados, gráficos y lecturas; quedan los controles */
+.examen-banner { display: none; background: var(--rojo-claro); border-left: 4px solid var(--rojo); padding: .5rem .8rem; border-radius: 0 6px 6px 0; font-size: .82rem; margin-top: .5rem; }
+body.examen .examen-banner { display: block; }
+body.examen .examen-btn { background: var(--rojo); color: #fff; border-color: var(--rojo); }
+body.examen .results-grid, body.examen .liq-flow, body.examen .chart-container, body.examen .chart-tools,
+body.examen .interpretation, body.examen .aviso, body.examen .ded-row .res,
+body.examen table.tabla:not(:has(input)), body.examen .guia details, body.examen .guia .pregunta { display: none !important; }
+body.examen .chart-tools ~ .inline-note, body.examen .chart-tools ~ p { display: none !important; }

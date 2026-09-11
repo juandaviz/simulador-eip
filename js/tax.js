@@ -8,20 +8,26 @@
   'use strict';
   const TAX = {};
 
-  /* ---------- Escalas ---------- */
-  // Cada tramo: [desde, hasta, tipo]
-  TAX.ESCALAS = {
-    estatal2025: [[0, 12450, .095], [12450, 20200, .12], [20200, 35200, .15], [35200, 60000, .185], [60000, 300000, .225], [300000, Infinity, .245]],
-    andalucia2025: [[0, 13000, .095], [13000, 21100, .12], [21100, 35200, .15], [35200, 60000, .185], [60000, Infinity, .225]],
-    madrid2025: [[0, 13362.22, .085], [13362.22, 19004.63, .107], [19004.63, 35425.68, .128], [35425.68, 57320.40, .174], [57320.40, Infinity, .205]],
-    // Base del ahorro: suma de la parte estatal y la autonómica (mitad y mitad)
-    ahorro2025: [[0, 6000, .19], [6000, 50000, .21], [50000, 200000, .23], [200000, 300000, .27], [300000, Infinity, .30]]
+  /* ---------- Parámetros del ejercicio activo ---------- */
+  TAX.setYear = function (y) {
+    const P = root.PARAMS && root.PARAMS[y];
+    if (!P) throw new Error('No hay parámetros para el ejercicio ' + y);
+    TAX.P = P; TAX.ejercicio = y;
+    TAX.ESCALAS = {
+      estatal2025: P.irpf.escalas.estatal, andalucia2025: P.irpf.escalas.andalucia, madrid2025: P.irpf.escalas.madrid, ahorro2025: P.irpf.escalas.ahorro,
+      estatal: P.irpf.escalas.estatal, andalucia: P.irpf.escalas.andalucia, madrid: P.irpf.escalas.madrid, ahorro: P.irpf.escalas.ahorro
+    };
+    TAX.BASE_MAX_COTIZACION_2025 = P.cotizaciones.baseMaxMes * 12;
+    TAX.TIPO_COTIZACION_TRABAJADOR = Object.values(P.cotizaciones.trabajador).reduce((a, b) => a + b, 0);
+    TAX.TIPO_COTIZACION_EMPRESA = Object.values(P.cotizaciones.empresa).reduce((a, b) => a + b, 0);
+    TAX.OTROS_GASTOS = P.irpf.otrosGastos;
   };
   TAX.CCAA = {
-    and: { nombre: 'Andalucía', escala: 'andalucia2025' },
-    mad: { nombre: 'Comunidad de Madrid', escala: 'madrid2025' },
-    est: { nombre: 'Escala estatal duplicada (referencia)', escala: 'estatal2025' }
+    and: { nombre: 'Andalucía', escala: 'andalucia' },
+    mad: { nombre: 'Comunidad de Madrid', escala: 'madrid' },
+    est: { nombre: 'Escala estatal duplicada (referencia)', escala: 'estatal' }
   };
+  TAX.setYear(root.EJERCICIO_ACTUAL || 2025);
 
   // Aplica una escala por tramos a una base. Devuelve cuota, tipo marginal y desglose.
   TAX.aplicaEscala = function (base, tramos) {
@@ -49,54 +55,49 @@
   };
 
   /* ---------- Rendimientos del trabajo ---------- */
-  TAX.BASE_MAX_COTIZACION_2025 = 4909.50 * 12; // 58.914 €/año
-  TAX.TIPO_COTIZACION_TRABAJADOR = 0.0648;      // 4,70 CC + 1,55 desempleo + 0,10 FP + 0,13 MEI
-  TAX.TIPO_COTIZACION_EMPRESA = 0.3210;         // 23,60 CC + 5,50 desempleo + 0,20 FOGASA + 0,60 FP + 0,67 MEI + ~0,63 AT/EP (medio)
-  TAX.OTROS_GASTOS = 2000;
-
   TAX.cotizacionTrabajador = bruto => Math.min(bruto, TAX.BASE_MAX_COTIZACION_2025) * TAX.TIPO_COTIZACION_TRABAJADOR;
   TAX.cotizacionEmpresa = bruto => Math.min(bruto, TAX.BASE_MAX_COTIZACION_2025) * TAX.TIPO_COTIZACION_EMPRESA;
 
   // Reducción por obtención de rendimientos del trabajo (art. 20 LIRPF, 2025)
   TAX.reduccionTrabajo = function (rendimientoNeto) {
-    if (rendimientoNeto <= 14852) return 7302;
-    if (rendimientoNeto <= 17673.52) return 7302 - 1.75 * (rendimientoNeto - 14852);
-    if (rendimientoNeto <= 19747.50) return 2364.34 - 1.14 * (rendimientoNeto - 17673.52);
+    const r = TAX.P.irpf.reduccionTrabajo;
+    if (rendimientoNeto <= r.t1) return r.max;
+    if (rendimientoNeto <= r.t2) return r.max - r.p1 * (rendimientoNeto - r.t1);
+    if (rendimientoNeto <= r.t3) return (r.max - r.p1 * (r.t2 - r.t1)) - r.p2 * (rendimientoNeto - r.t2);
     return 0;
   };
 
   /* ---------- Mínimo personal y familiar (arts. 56-61 LIRPF) ---------- */
   TAX.minimo = function (p) {
-    p = p || {};
-    let personal = 5550;
-    if (p.mayor75) personal += 1150 + 1400; else if (p.mayor65) personal += 1150;
-    const porHijo = [2400, 2700, 4000, 4500];
+    p = p || {}; const M = TAX.P.irpf.minimo;
+    let personal = M.personal;
+    if (p.mayor75) personal += M.mayor65 + M.mayor75; else if (p.mayor65) personal += M.mayor65;
     let descendientes = 0;
     const hijos = p.hijos || 0;
-    for (let i = 0; i < hijos; i++) descendientes += i < 4 ? porHijo[i] : 4500;
-    descendientes += 2800 * Math.min(p.hijosMenores3 || 0, hijos);
-    let ascendientes = 0;
-    if (p.ascendientes) ascendientes = 1150 * p.ascendientes;
+    for (let i = 0; i < hijos; i++) descendientes += i < M.descendientes.length ? M.descendientes[i] : M.descendientes[M.descendientes.length - 1];
+    descendientes += M.menor3 * Math.min(p.hijosMenores3 || 0, hijos);
+    const ascendientes = M.ascendiente * (p.ascendientes || 0);
     let discapacidad = 0;
-    if (p.discapacidad === '33') discapacidad = 3000;
-    if (p.discapacidad === '65') discapacidad = 9000 + 3000;
+    if (p.discapacidad === '33') discapacidad = M.discapacidad33;
+    if (p.discapacidad === '65') discapacidad = M.discapacidad65 + M.asistencia;
     return { personal, descendientes, ascendientes, discapacidad, total: personal + descendientes + ascendientes + discapacidad };
   };
 
   /* ---------- Deducciones ---------- */
   // Donativos a entidades de la Ley 49/2002 (desde 2024): 80 % hasta 250 €, 40 % del resto (45 % si recurrente)
   TAX.deduccionDonativos = function (importe, recurrente) {
+    const D = TAX.P.irpf.deducciones.donativos;
     if (importe <= 0) return 0;
-    return Math.min(importe, 250) * 0.80 + Math.max(0, importe - 250) * (recurrente ? 0.45 : 0.40);
+    return Math.min(importe, D.primeros) * D.pct1 + Math.max(0, importe - D.primeros) * (recurrente ? D.pct2rec : D.pct2);
   };
   // Vivienda habitual (régimen transitorio, adquisiciones anteriores a 2013): 15 % sobre un máximo de 9.040 €
-  TAX.deduccionVivienda = base => Math.min(Math.max(base, 0), 9040) * 0.15;
+  TAX.deduccionVivienda = base => Math.min(Math.max(base, 0), TAX.P.irpf.deducciones.viviendaBase) * TAX.P.irpf.deducciones.viviendaPct;
   // Ley 5/2025: deducción para rendimientos del trabajo bajos (compensa la retención sobre el SMI).
   // 340 € si los rendimientos íntegros del trabajo no superan 16.576 €; decrece linealmente hasta 18.276 €.
   TAX.deduccionLey52025 = function (rendimientosIntegrosTrabajo) {
-    const r = rendimientosIntegrosTrabajo;
-    if (r <= 16576) return 340;
-    if (r < 18276) return 340 - 0.20 * (r - 16576);
+    const L = TAX.P.irpf.deducciones.ley52025, r = rendimientosIntegrosTrabajo;
+    if (r <= L.umbral1) return L.importe;
+    if (r < L.umbral2) return L.importe * (1 - (r - L.umbral1) / (L.umbral2 - L.umbral1));
     return 0;
   };
 
@@ -145,22 +146,23 @@
     d.vivienda = TAX.deduccionVivienda(p.viviendaBase);
     // Alquiler (régimen transitorio): 10,05 % de lo pagado; base máxima 9.040 € hasta BI 17.707,20, decreciente hasta 24.107,20
     let baseAlq = 0;
-    if (p.alquilerPagado > 0 && baseImponible < 24107.20) {
-      const max = baseImponible <= 17707.20 ? 9040 : 9040 - 1.4125 * (baseImponible - 17707.20);
+    const K = TAX.P.irpf.deducciones;
+    if (p.alquilerPagado > 0 && baseImponible < K.alquilerBI2) {
+      const max = baseImponible <= K.alquilerBI1 ? K.alquilerBase : K.alquilerBase * (1 - (baseImponible - K.alquilerBI1) / (K.alquilerBI2 - K.alquilerBI1));
       baseAlq = Math.min(p.alquilerPagado, Math.max(0, max));
     }
-    d.alquiler = 0.1005 * baseAlq;
+    d.alquiler = K.alquilerPct * baseAlq;
     // Donativos según destino
     const x = Math.max(0, p.donativos || 0);
     switch (p.donativosTipo) {
-      case 'prioritarias': d.donativos = Math.min(x, 250) * 0.85 + Math.max(0, x - 250) * (p.donativosRecurrente ? 0.50 : 0.45); break;
-      case 'partidos': d.donativos = 0.20 * Math.min(x, 600); break;
-      case 'otras': d.donativos = 0.10 * x; break;
+      case 'prioritarias': d.donativos = Math.min(x, K.donativos.primeros) * K.donativos.prioritarias1 + Math.max(0, x - K.donativos.primeros) * (p.donativosRecurrente ? K.donativos.prioritarias2rec : K.donativos.prioritarias2); break;
+      case 'partidos': d.donativos = K.donativos.partidos * Math.min(x, K.donativos.partidosBase); break;
+      case 'otras': d.donativos = K.donativos.otras * x; break;
       default: d.donativos = TAX.deduccionDonativos(x, p.donativosRecurrente);
     }
-    d.empresaNueva = 0.50 * Math.min(Math.max(0, p.empresaNueva || 0), 100000);
-    d.vehiculo = 0.15 * Math.min(Math.max(0, p.vehiculoElectrico || 0), 20000) + 0.15 * Math.min(Math.max(0, p.puntoRecarga || 0), 4000);
-    const baseEf = { 20: 5000, 40: 7500, 60: 5000 }[p.eficienciaPct] || 0;
+    d.empresaNueva = K.empresaNuevaPct * Math.min(Math.max(0, p.empresaNueva || 0), K.empresaNuevaBase);
+    d.vehiculo = K.vehiculoPct * Math.min(Math.max(0, p.vehiculoElectrico || 0), K.vehiculoBase) + K.vehiculoPct * Math.min(Math.max(0, p.puntoRecarga || 0), K.recargaBase);
+    const baseEf = K.eficiencia[p.eficienciaPct] || 0;
     d.eficiencia = (p.eficienciaPct / 100) * Math.min(Math.max(0, p.eficienciaImporte || 0), baseEf);
     d.ley52025 = p.aplicarLey52025 ? TAX.deduccionLey52025(p.trabajoBruto) : 0;
     return d;
@@ -188,12 +190,12 @@
       viviendaBase: 0, alquilerPagado: 0, donativos: 0, donativosTipo: '49', donativosRecurrente: false, empresaNueva: 0, vehiculoElectrico: 0, puntoRecarga: 0, eficienciaImporte: 0, eficienciaPct: 0, aplicarLey52025: true,
       dedAutonomicas: 0, andalucia: null,
       maternidad: false, familiaNumerosa: 'no', descendientesDiscapacidad: 0,
-      retencionesTrabajo: null, retencionAhorro: 0.19
+      retencionesTrabajo: null, retencionAhorro: TAX.P.irpf.retencionAhorro
     }, p || {});
 
-    const escEst = TAX.ESCALAS.estatal2025;
+    const escEst = TAX.ESCALAS.estatal;
     const escAut = TAX.ESCALAS[TAX.CCAA[p.ccaa].escala];
-    const escAho = TAX.ESCALAS.ahorro2025;
+    const escAho = TAX.ESCALAS.ahorro;
 
     // 1. Rendimiento neto del trabajo
     const cotizaciones = p.cotizaciones == null ? TAX.cotizacionTrabajador(p.trabajoBruto) : p.cotizaciones;
@@ -209,14 +211,15 @@
 
     // 3. Reducciones de la base imponible general
     const red = {};
-    const propio = Math.min(Math.max(0, p.planPensiones), 1500);
-    const empresa = Math.min(Math.max(0, p.planEmpresa), 8500);
-    red.prevision = Math.min(propio + empresa, 0.30 * rnTrabajo);           // límite conjunto: 30 % de los rendimientos del trabajo
-    red.conyuge = Math.min(Math.max(0, p.planConyuge), 1000);
+    const RR = TAX.P.irpf.reducciones;
+    const propio = Math.min(Math.max(0, p.planPensiones), RR.planPropio);
+    const empresa = Math.min(Math.max(0, p.planEmpresa), RR.planEmpresa);
+    red.prevision = Math.min(propio + empresa, RR.topeRendimientos * rnTrabajo);           // límite conjunto: 30 % de los rendimientos del trabajo
+    red.conyuge = Math.min(Math.max(0, p.planConyuge), RR.planConyuge);
     red.pensionCompensatoria = Math.max(0, p.pensionCompensatoria);
-    red.previsionDiscapacidad = Math.min(Math.max(0, p.previsionDiscapacidad), 10000);
-    red.patrimonioProtegido = Math.min(Math.max(0, p.patrimonioProtegido), 10000);
-    red.conjunta = p.conjunta === 'bi' ? 3400 : p.conjunta === 'mono' ? 2150 : 0;
+    red.previsionDiscapacidad = Math.min(Math.max(0, p.previsionDiscapacidad), RR.previsionDiscapacidad);
+    red.patrimonioProtegido = Math.min(Math.max(0, p.patrimonioProtegido), RR.patrimonioProtegido);
+    red.conjunta = p.conjunta === 'bi' ? RR.conjuntaBi : p.conjunta === 'mono' ? RR.conjuntaMono : 0;
     const totalReducciones = Object.values(red).reduce((a, b) => a + b, 0);
     const pensiones = red.prevision; // compatibilidad con versiones anteriores
     const reduccionesGeneral = Math.min(totalReducciones, baseGeneral);
@@ -259,10 +262,11 @@
     // 7. Pagos a cuenta y deducciones reembolsables (minoran la cuota diferencial, puedan o no absorberse)
     const retencionesTrabajo = p.retencionesTrabajo == null ? 0.15 * p.trabajoBruto : p.retencionesTrabajo;
     const retencionesAhorro = Math.max(0, p.capitalMobiliario) * p.retencionAhorro;
+    const KD = TAX.P.irpf.deducciones;
     const reemb = {
-      maternidad: p.maternidad && p.hijosMenores3 > 0 ? 1200 * p.hijosMenores3 : 0,
-      familiaNumerosa: p.familiaNumerosa === 'especial' ? 2400 : p.familiaNumerosa === 'general' ? 1200 : 0,
-      descendientesDiscapacidad: 1200 * Math.max(0, p.descendientesDiscapacidad || 0)
+      maternidad: p.maternidad && p.hijosMenores3 > 0 ? KD.maternidad * p.hijosMenores3 : 0,
+      familiaNumerosa: p.familiaNumerosa === 'especial' ? KD.familiaNumerosaEspecial : p.familiaNumerosa === 'general' ? KD.familiaNumerosa : 0,
+      descendientesDiscapacidad: KD.discapacidadCargo * Math.max(0, p.descendientesDiscapacidad || 0)
     };
     const maternidad = reemb.maternidad;
     const reembolsables = reemb.maternidad + reemb.familiaNumerosa + reemb.descendientesDiscapacidad;

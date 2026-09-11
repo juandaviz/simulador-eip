@@ -202,11 +202,21 @@
     </div>`;
   }
   function presetsHTML(m) {
-    if (!m.presets || !m.presets.length) return '';
+    const ex = `<button class="btn small examen-btn" type="button" data-examen title="Oculta resultados, tablas y gráficos para resolver el ejercicio a mano; vuelve a pulsar para comprobar">Modo examen</button>`;
+    if (!m.presets || !m.presets.length) return `<div class="presets">${ex}</div>`;
     return `<div class="presets"><span class="label">Escenarios:</span>${m.presets.map((p, i) =>
       `<button class="btn small" type="button" data-preset="${i}" title="${p.title || ''}">${p.label}</button>`).join('')}
-      <button class="btn small" type="button" data-reset title="${m.resetCero === false ? 'Vuelve a los valores iniciales' : 'Pone todos los valores a cero para hacer el ejercicio a mano'}">${m.resetCero === false ? 'Restablecer' : 'Restablecer (a cero)'}</button></div>`;
+      <button class="btn small" type="button" data-reset title="${m.resetCero === false ? 'Vuelve a los valores iniciales' : 'Pone todos los valores a cero para hacer el ejercicio a mano'}">${m.resetCero === false ? 'Restablecer' : 'Restablecer (a cero)'}</button>${ex}</div>
+      <div class="examen-banner">Modo examen: los resultados, las tablas y los gráficos están ocultos. Introduce los datos, resuelve a mano y pulsa <strong>Comprobar</strong> para ver la solución.</div>`;
   }
+  // Modo examen: oculta todo lo que sea resultado (clase en body, recordada en la sesión del navegador)
+  function setExamen(on) {
+    document.body.classList.toggle('examen', on);
+    document.querySelectorAll('[data-examen]').forEach(b => { b.textContent = on ? 'Comprobar' : 'Modo examen'; b.classList.toggle('active', on); });
+    try { sessionStorage.setItem('sim-examen', on ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
+    const m = current(); if (m) m.update(m.root);   // los gráficos se redibujan al volver a mostrarse
+  }
+  SIM.setExamen = setExamen;
 
   function mount() {
     const nav = document.getElementById('nav');
@@ -240,10 +250,13 @@
         const b = e.target.closest('button');
         if (!b) return;
         if (b.dataset.export !== undefined) { SIM.exportPNG(b.dataset.export, m.id + '-' + b.dataset.export); }
+        if (b.dataset.examen !== undefined) { setExamen(!document.body.classList.contains('examen')); }
         if (b.dataset.preset !== undefined) { applyState(panel, m.presets[+b.dataset.preset].values); markPreset(panel, +b.dataset.preset); m.update(panel); pushState(m); }
         if (b.dataset.reset !== undefined) { applyState(panel, m.resetCero === false ? m.defaults : estadoCero(panel)); markPreset(panel, -1); m.update(panel); pushState(m); }
       });
     });
+    let ex = false; try { ex = sessionStorage.getItem('sim-examen') === '1'; } catch (e) { /* nada */ }
+    if (ex) setExamen(true);
     window.addEventListener('hashchange', route);
     window.addEventListener('resize', () => { const m = current(); if (m) m.update(m.root); });
     route();
