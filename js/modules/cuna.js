@@ -85,9 +85,9 @@
       </div>
       <table class="tabla" id="cuna-tabla"></table>
 
-      <h3>En meses: 12 o 14 pagas</h3>
+      <h3>La nómina de cada mes: 12 o 14 pagas</h3>
       <table class="tabla" id="cuna-tabla-meses"></table>
-      <p class="inline-note">Con 14 pagas, las dos extraordinarias (junio y diciembre) suelen ir sin cotización aparte, porque ésta se prorratea en las doce mensuales; la retención del IRPF también se reparte. Aquí se divide el importe anual por el número de pagas: es la nómina «media» de cada modalidad.</p>
+      <p class="inline-note" id="cuna-meses-nota"></p>
     </div>
   </div>
 
@@ -182,16 +182,43 @@
       <tr class="total"><td>Salario neto</td><td>${F.n0(R.neto)}</td><td>${F.pct(R.coste > 0 ? R.neto / R.coste : 0, 1)}</td><td>lo que llega a la cuenta corriente</td></tr>
       <tr class="total"><td>Cuña fiscal</td><td>${F.n0(R.coste - R.neto)}</td><td>${F.pct(R.cuna, 1)}</td><td>coste laboral − salario neto</td></tr></tbody>`);
 
-    /* Tabla en meses: 12 y 14 pagas */
-    const filaM = (n, v, cls) => `<tr${cls ? ` class="${cls}"` : ''}><td>${n}</td><td>${F.n0(v)}</td><td>${F.n0(v / 12)}</td><td>${F.n0(v / 14)}</td></tr>`;
-    SIM.html('cuna-tabla-meses', `<thead><tr><th>Concepto</th><th>Al año (€)</th><th>Por paga, 12 pagas (€)</th><th>Por paga, 14 pagas (€)</th></tr></thead><tbody>
-      ${filaM('Coste laboral total', R.coste)}
-      ${filaM('Cotización de la empresa', R.cotEmpresa)}
-      ${filaM('Salario bruto', R.bruto)}
-      ${filaM('Cotización del trabajador', R.cotTrabajador)}
-      ${filaM('IRPF', R.irpf)}
-      ${filaM('Salario neto', R.neto, 'total')}
-      ${filaM('Cuña fiscal', R.coste - R.neto, 'total')}</tbody>`);
+    /* La nómina de cada mes, con 12 y con 14 pagas.
+       Reglas reales de la nómina española:
+       - La base de cotización mensual incluye la prorrata de las pagas extra (= bruto anual / 12,
+         con el tope de la base máxima mensual), así que las cotizaciones —de empresa y de
+         trabajador— se ingresan en 12 mensualidades iguales y las extras no cotizan aparte.
+       - La retención del IRPF se aplica con el mismo tipo a todas las pagas, extras incluidas:
+         el mes con paga extra retiene el doble. Aquí el tipo de retención se toma igual al
+         tipo medio de la cuota líquida (IRPF anual / bruto anual), de modo que las retenciones
+         del año suman exactamente el IRPF anual. */
+    const tRet = R.bruto > 0 ? R.irpf / R.bruto : 0;
+    const n12 = {   // 12 pagas: todos los meses iguales
+      bruto: R.bruto / 12, cotT: R.cotTrabajador / 12, cotE: R.cotEmpresa / 12
+    };
+    const n14 = {   // 14 pagas, mes sin extra (10 al año)
+      bruto: R.bruto / 14, cotT: R.cotTrabajador / 12, cotE: R.cotEmpresa / 12
+    };
+    const n14x = {  // 14 pagas, mes con extra (junio y diciembre): dos pagas, una sola cotización
+      bruto: 2 * R.bruto / 14, cotT: R.cotTrabajador / 12, cotE: R.cotEmpresa / 12
+    };
+    [n12, n14, n14x].forEach(m => {
+      m.irpf = tRet * m.bruto;
+      m.neto = m.bruto - m.cotT - m.irpf;
+      m.coste = m.bruto + m.cotE;
+    });
+    const filaM = (n, k, cls) => `<tr${cls ? ` class="${cls}"` : ''}><td>${n}</td><td>${F.n0(n12[k])}</td><td>${F.n0(n14[k])}</td><td>${F.n0(n14x[k])}</td></tr>`;
+    SIM.html('cuna-tabla-meses', `<thead><tr><th>Concepto (€ del mes)</th><th>12 pagas<br>cada mes</th><th>14 pagas<br>mes normal (×10)</th><th>14 pagas<br>mes con extra (×2)</th></tr></thead><tbody>
+      ${filaM('Coste para la empresa', 'coste')}
+      ${filaM('Cotización de la empresa', 'cotE')}
+      ${filaM('Salario bruto de la nómina', 'bruto')}
+      ${filaM('Cotización del trabajador', 'cotT')}
+      ${filaM(`Retención IRPF (${F.pct(tRet, 1)})`, 'irpf')}
+      ${filaM('Salario neto (lo que se ingresa)', 'neto', 'total')}</tbody>`);
+    SIM.html('cuna-meses-nota',
+      `Las cotizaciones se calculan sobre la <strong>base de cotización mensual</strong> (${F.eur0(Math.min(R.bruto, BM) / 12)}), que ya incluye la prorrata de las pagas extra: por eso son iguales todos los meses y las extras de junio y diciembre no cotizan aparte. `
+      + `La retención se aplica al ${F.pct(tRet, 1)} sobre todas las pagas, extras incluidas, así que el mes con extra retiene el doble. `
+      + `Comprobación: 10 meses normales + 2 con extra = 12 meses de 12 pagas = ${F.eur0(R.neto)} netos al año. `
+      + `Con 14 pagas el neto mensual normal es ${F.eur0(n12.neto - n14.neto)} menor que con 12, y en junio y diciembre se cobran ${F.eur0(n14x.neto)}.`);
 
     /* Aviso sobre la base máxima */
     let aviso = `<strong>Base máxima de cotización 2025:</strong> ${F.eur0(BM)} al año (4.909,50 € al mes). `;
