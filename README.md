@@ -21,7 +21,7 @@ Simuladores interactivos para **Hacienda Pública II** (Grado en Economía) y **
 | Bunching | Tema 9 | Amontonamiento en un kink de la tarifa (Saez 2010) y cómo se recupera la elasticidad. |
 | Oferta de trabajo | Tema 9 | Restricción presupuestaria con tramos y prestación condicionada, efecto renta y sustitución (Slutsky numérico), tipo marginal efectivo y trampa de la pobreza. |
 | Progresividad en frío | Tema 10 | Qué pasa con el tipo medio cuando la tarifa no se deflacta. |
-| Cuña fiscal | Tema 11 | Del coste laboral al salario neto: cotizaciones de empresa y trabajador e IRPF. |
+| Cuña fiscal | Tema 11 | Del coste laboral al salario neto: cotizaciones de empresa y trabajador e IRPF, con el desglose por paga (12 y 14 pagas). |
 | Cuentas públicas | Tema 12 | Ingresos, gastos, déficit y deuda a 10 años, calibrado a Eurostat 2025. |
 
 Cada módulo tiene **escenarios predefinidos**, un botón **«Restablecer (a cero)»** para trabajar el ejercicio a mano, un **modo examen** que oculta resultados, tablas y gráficos hasta pulsar «Comprobar», una caja **«Qué observar»** con pregunta de repaso, un texto de lectura que traduce los números, y botón para **descargar cada gráfico en PNG**.

@@ -84,6 +84,10 @@
         ${SIM.result('cuna-r-irpf', 'IRPF', 'puntos de la cuña')}
       </div>
       <table class="tabla" id="cuna-tabla"></table>
+
+      <h3>En meses: 12 o 14 pagas</h3>
+      <table class="tabla" id="cuna-tabla-meses"></table>
+      <p class="inline-note">Con 14 pagas, las dos extraordinarias (junio y diciembre) suelen ir sin cotización aparte, porque ésta se prorratea en las doce mensuales; la retención del IRPF también se reparte. Aquí se divide el importe anual por el número de pagas: es la nómina «media» de cada modalidad.</p>
     </div>
   </div>
 
@@ -177,6 +181,17 @@
       ${fila('IRPF (cuota líquida)', R.irpf, `tipo medio del ${F.pct(R.liquidacion.tipoMedio, 1)}; marginal del ${F.pct(R.liquidacion.marginalGeneral, 1)}`)}
       <tr class="total"><td>Salario neto</td><td>${F.n0(R.neto)}</td><td>${F.pct(R.coste > 0 ? R.neto / R.coste : 0, 1)}</td><td>lo que llega a la cuenta corriente</td></tr>
       <tr class="total"><td>Cuña fiscal</td><td>${F.n0(R.coste - R.neto)}</td><td>${F.pct(R.cuna, 1)}</td><td>coste laboral − salario neto</td></tr></tbody>`);
+
+    /* Tabla en meses: 12 y 14 pagas */
+    const filaM = (n, v, cls) => `<tr${cls ? ` class="${cls}"` : ''}><td>${n}</td><td>${F.n0(v)}</td><td>${F.n0(v / 12)}</td><td>${F.n0(v / 14)}</td></tr>`;
+    SIM.html('cuna-tabla-meses', `<thead><tr><th>Concepto</th><th>Al año (€)</th><th>Por paga, 12 pagas (€)</th><th>Por paga, 14 pagas (€)</th></tr></thead><tbody>
+      ${filaM('Coste laboral total', R.coste)}
+      ${filaM('Cotización de la empresa', R.cotEmpresa)}
+      ${filaM('Salario bruto', R.bruto)}
+      ${filaM('Cotización del trabajador', R.cotTrabajador)}
+      ${filaM('IRPF', R.irpf)}
+      ${filaM('Salario neto', R.neto, 'total')}
+      ${filaM('Cuña fiscal', R.coste - R.neto, 'total')}</tbody>`);
 
     /* Aviso sobre la base máxima */
     let aviso = `<strong>Base máxima de cotización 2025:</strong> ${F.eur0(BM)} al año (4.909,50 € al mes). `;
